@@ -9,6 +9,7 @@ test-args.txt
 ~*.docx
 \#*\#
 .\#*
+dist
 tests/baselines/local/*
 tests/baselines/local.old/*
 tests/services/baselines/local/*
