@@ -1,0 +1,24 @@
+{
+  "files": {
+    "main.css": "/static/css/main.9dd16dc8.css",
+    "main.js": "/static/js/main.d8b86fae.js",
+    "static/js/977.7b43cfeb.chunk.js": "/static/js/977.7b43cfeb.chunk.js",
+    "static/js/706.7ddee524.chunk.js": "/static/js/706.7ddee524.chunk.js",
+    "static/js/627.9a5e0f06.chunk.js": "/static/js/627.9a5e0f06.chunk.js",
+    "static/js/888.2185869b.chunk.js": "/static/js/888.2185869b.chunk.js",
+    "static/js/52.3c434ad9.chunk.js": "/static/js/52.3c434ad9.chunk.js",
+    "static/js/121.a02e5311.chunk.js": "/static/js/121.a02e5311.chunk.js",
+    "static/js/989.0a6228b7.chunk.js": "/static/js/989.0a6228b7.chunk.js",
+    "static/js/891.1ecc797c.chunk.js": "/static/js/891.1ecc797c.chunk.js",
+    "static/js/191.dfc4fbe0.chunk.js": "/static/js/191.dfc4fbe0.chunk.js",
+    "static/media/web3authLogoBlue.svg": "/static/media/web3authLogoBlue.3f79a06f163dc41c3a161537a2e8fa52.svg",
+    "static/media/web3authLogoWhite.svg": "/static/media/web3authLogoWhite.d381e6db26918061f971a6634815a868.svg",
+    "index.html": "/index.html",
+    "main.9dd16dc8.css.map": "/static/css/main.9dd16dc8.css.map",
+    "main.d8b86fae.js.map": "/static/js/main.d8b86fae.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.9dd16dc8.css",
+    "static/js/main.d8b86fae.js"
+  ]
+}
