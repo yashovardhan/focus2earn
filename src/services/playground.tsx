@@ -1,9 +1,7 @@
-import { ADAPTER_STATUS, CustomChainConfig, IProvider, WALLET_ADAPTERS } from "@web3auth/base";
+import { ADAPTER_STATUS, IProvider } from "@web3auth/base";
 import { useWeb3Auth } from "@web3auth/modal-react-hooks";
-import * as jose from "jose";
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-import { chain } from "../config/chainConfig";
 import { getWalletProvider, IWalletProvider } from "./walletProvider";
 
 export interface IPlaygroundContext {
@@ -11,26 +9,26 @@ export interface IPlaygroundContext {
   isLoading: boolean;
   address: string;
   balance: string;
-  chainList: { [key: string]: CustomChainConfig };
-  chainListOptionSelected: string;
+  focusTime: number;
+  userTokenBalance: string;
+  contractTokenBalance: string;
+  totalRewardsClaimed: string;
   chainId: string;
   playgroundConsole: string;
-  connectedChain: CustomChainConfig;
   getUserInfo: () => Promise<any>;
-  getPublicKey: () => Promise<string>;
   getAddress: () => Promise<string>;
   getBalance: () => Promise<string>;
-  getSignature: (message: string) => Promise<string>;
-  sendTransaction: (amount: string, destination: string) => Promise<string>;
-  getPrivateKey: () => Promise<string>;
   getChainId: () => Promise<string>;
-  deployContract: (abi: any, bytecode: string, initValue: string) => Promise<any>;
-  readContract: (contractAddress: string, contractABI: any) => Promise<string>;
-  writeContract: (contractAddress: string, contractABI: any, updatedValue: string) => Promise<string>;
-  getIdToken: () => Promise<string>;
-  verifyServerSide: (idToken: string) => Promise<any>;
-  switchChain: (customChainConfig: CustomChainConfig) => Promise<void>;
-  updateConnectedChain: (network: string | CustomChainConfig) => void;
+  claimInitialReward: () => Promise<any>;
+  claimRewards: () => Promise<any>;
+  startFocus: (depositAmount: string) => Promise<any>;
+  stopFocus: () => Promise<any>;
+  getUserTokenBalance: () => Promise<any>;
+  getContractTokenBalance: () => Promise<any>;
+  getUserDetails: () => Promise<any>;
+  getTotalRewardsClaimed: () => Promise<any>;
+  getRewardRatePerSecond: () => Promise<any>;
+  getInitialReward: () => Promise<any>;
 }
 
 export const PlaygroundContext = createContext<IPlaygroundContext>({
@@ -38,26 +36,26 @@ export const PlaygroundContext = createContext<IPlaygroundContext>({
   isLoading: false,
   address: null,
   balance: null,
+  focusTime: 0,
+  userTokenBalance: null,
+  contractTokenBalance: null,
+  totalRewardsClaimed: null,
   chainId: null,
   playgroundConsole: "",
-  chainList: chain,
-  chainListOptionSelected: "ethereum",
-  connectedChain: chain.ethereum,
   getUserInfo: async () => null,
-  getPublicKey: async () => "",
   getAddress: async () => "",
   getBalance: async () => "",
-  getSignature: async () => "",
-  sendTransaction: async () => "",
-  getPrivateKey: async () => "",
   getChainId: async () => "",
-  deployContract: async () => {},
-  readContract: async () => "",
-  writeContract: async () => "",
-  getIdToken: async () => "",
-  verifyServerSide: async () => {},
-  switchChain: async () => null,
-  updateConnectedChain: () => {},
+  claimInitialReward: async () => {},
+  claimRewards: async () => {},
+  startFocus: async () => {},
+  stopFocus: async () => {},
+  getUserTokenBalance: async () => {},
+  getContractTokenBalance: async () => {},
+  getUserDetails: async () => {},
+  getTotalRewardsClaimed: async () => {},
+  getRewardRatePerSecond: async () => {},
+  getInitialReward: async () => {},
 });
 
 interface IPlaygroundProps {
@@ -73,17 +71,20 @@ export const Playground = ({ children }: IPlaygroundProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
-  const [chainList, setChainDetails] = useState(chain);
-  const [chainListOptionSelected, setChainListOptionSelected] = useState("ethereum");
+  const [userTokenBalance, setUserTokenBalance] = useState<string | null>(null);
+  const [contractTokenBalance, setContractTokenBalance] = useState<string | null>(null);
   const [chainId, setChainId] = useState<any>(null);
+  const [totalRewardsClaimed, setTotalRewardsClaimed] = useState<string | null>(null);
   const [playgroundConsole, setPlaygroundConsole] = useState<string>("");
-  const [connectedChain, setConnectedChain] = useState<CustomChainConfig>(chain.ethereum);
+  const [focusTime, setFocusTime] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const uiConsole = (...args: unknown[]) => {
     setPlaygroundConsole(`${JSON.stringify(args || {}, null, 2)}\n\n\n\n${playgroundConsole}`);
     console.log(...args);
   };
 
-  const { status, connect, addAndSwitchChain, userInfo, provider, web3Auth, authenticateUser } = useWeb3Auth();
+  const { status, connect, userInfo, provider, web3Auth, authenticateUser } = useWeb3Auth();
   // const { showCheckout, showWalletConnectScanner, showWalletUI } = useWalletServicesPlugin();
 
   const setNewWalletProvider = useCallback(
@@ -92,8 +93,11 @@ export const Playground = ({ children }: IPlaygroundProps) => {
       setAddress(await walletProvider?.getAddress());
       setBalance(await walletProvider?.getBalance());
       setChainId(await walletProvider?.getChainId());
+      setUserTokenBalance(await walletProvider?.getUserTokenBalance());
+      setContractTokenBalance(await walletProvider?.getContractTokenBalance());
+      setTotalRewardsClaimed(await walletProvider?.getTotalRewardsClaimed());
     },
-    [chainId, address, balance]
+    [chainId, address, balance, userTokenBalance, contractTokenBalance, totalRewardsClaimed, playgroundConsole]
   );
 
   useEffect(() => {
@@ -104,6 +108,23 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     }
   }, [web3Auth, status, provider, connect, setNewWalletProvider]);
 
+  const startTimer = () => {
+    if (!isRunning) {
+      setIsRunning(true);
+      intervalRef.current = setInterval(() => {
+        setFocusTime((prevSeconds) => prevSeconds + 1);
+      }, 1000);
+    }
+  };
+
+  const stopTimer = () => {
+    if (isRunning) {
+      clearInterval(intervalRef.current!);
+      setIsRunning(false);
+      setFocusTime(0);
+    }
+  };
+
   const getUserInfo = async () => {
     if (!web3Auth) {
       uiConsole("web3Auth not initialized yet");
@@ -111,17 +132,6 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     }
     uiConsole(userInfo);
     return userInfo;
-  };
-
-  const getPublicKey = async () => {
-    if (!web3Auth) {
-      uiConsole("web3Auth not initialized yet");
-      return "";
-    }
-
-    const publicKey = await walletProvider.getPublicKey();
-    uiConsole(publicKey);
-    return publicKey;
   };
 
   const getAddress = async () => {
@@ -148,34 +158,47 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     return balance;
   };
 
-  const getSignature = async (message: string) => {
-    if (!web3Auth) {
-      uiConsole("web3Auth not initialized yet");
-      return "";
+  const getUserTokenBalance = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
     }
-    const signature = await walletProvider.getSignature(message);
-    uiConsole(signature);
-    return signature;
+    try {
+      const tokenBalance = await walletProvider.getUserTokenBalance();
+      setUserTokenBalance(tokenBalance);
+      uiConsole(tokenBalance);
+      return tokenBalance;
+    } catch (error) {
+      uiConsole(`Error getting user token balance: ${(error as Error).message}`);
+    }
   };
 
-  const sendTransaction = async (amount: string, destination: string) => {
-    if (!web3Auth) {
-      uiConsole("web3Auth not initialized yet");
-      return "";
+  const getContractTokenBalance = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
     }
-    const receipt = await walletProvider.sendTransaction(amount, destination);
-    uiConsole(receipt);
-    return receipt;
+    try {
+      const tokenBalance = await walletProvider.getContractTokenBalance();
+      setContractTokenBalance(tokenBalance);
+      return tokenBalance;
+    } catch (error) {
+      uiConsole(`Error getting contract token balance: ${(error as Error).message}`);
+    }
   };
 
-  const getPrivateKey = async () => {
-    if (!web3Auth) {
-      uiConsole("web3Auth not initialized yet");
-      return "";
+  const getTotalRewardsClaimed = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
     }
-    const privateKey = await walletProvider.getPrivateKey();
-    uiConsole("Private Key: ", privateKey);
-    return privateKey;
+    try {
+      const tokenBalance = await walletProvider.getTotalRewardsClaimed();
+      setTotalRewardsClaimed(tokenBalance);
+      return tokenBalance;
+    } catch (error) {
+      uiConsole(`Error getting total rewards claimed: ${(error as Error).message}`);
+    }
   };
 
   const getChainId = async () => {
@@ -185,39 +208,6 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     }
 
     await walletProvider.getChainId();
-  };
-
-  const deployContract = async (abi: any, bytecode: string, initValue: string): Promise<any> => {
-    if (!web3Auth) {
-      uiConsole("web3Auth not initialized yet");
-      return;
-    }
-    const receipt = await walletProvider.deployContract(abi, bytecode, initValue);
-    return receipt;
-  };
-
-  const readContract = async (contractAddress: string, contractABI: any): Promise<string> => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const message = await walletProvider.readContract(contractAddress, contractABI);
-    uiConsole(message);
-  };
-
-  const writeContract = async (contractAddress: string, contractABI: any, updatedValue: string): Promise<string> => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const receipt = await walletProvider.writeContract(contractAddress, contractABI, updatedValue);
-    uiConsole(receipt);
-
-    if (receipt) {
-      setTimeout(async () => {
-        await readContract(contractAddress, contractABI);
-      }, 2000);
-    }
   };
 
   const parseToken = (token: any) => {
@@ -231,114 +221,121 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     }
   };
 
+  const claimInitialReward = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    setIsLoading(true);
+    uiConsole("Claiming tokens...");
+    try {
+      const result = await walletProvider.claimInitialReward();
+      uiConsole(result);
+    } catch (error) {
+      uiConsole(`Error claiming initial reward: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const claimRewards = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    setIsLoading(true);
+    uiConsole("Claiming tokens...");
+    try {
+      const result = await walletProvider.claimRewards();
+      uiConsole(result);
+    } catch (error) {
+      uiConsole(`Error claiming tokens: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startFocus = async (depositAmount: string) => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    try {
+      setIsLoading(true);
+      uiConsole("Starting focus mode...");
+      const focusModeStatus = await walletProvider.startFocus(depositAmount, 10);
+      // Start the timer
+      setFocusTime(0);
+      startTimer();
+      uiConsole(focusModeStatus);
+    } catch (error) {
+      uiConsole(`Error starting focus mode: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopFocus = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    try {
+      setIsLoading(true);
+      uiConsole("Stopping focus mode...");
+      const focusModeStatus = await walletProvider.stopFocus();
+      stopTimer();
+      setIsLoading(false);
+      uiConsole(`Focus mode stopped.${focusModeStatus}`);
+    } catch (error) {
+      setIsLoading(false);
+      uiConsole(`Error stopping focus mode: ${(error as Error).message}`);
+    }
+  };
+
+  const getUserDetails = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    try {
+      const userDetails = await walletProvider.getUserDetails();
+      uiConsole("User details: ", userInfo, userDetails);
+    } catch (error) {
+      uiConsole(`Error getting user details: ${(error as Error).message}`);
+    }
+  };
+
+  const getRewardRatePerSecond = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    try {
+      const rewardRatePerSecond = await walletProvider.getRewardRatePerSecond();
+      uiConsole(`Reward rate per second: ${rewardRatePerSecond}`);
+    } catch (error) {
+      uiConsole(`Error getting reward rate per second: ${(error as Error).message}`);
+    }
+  };
+
+  const getInitialReward = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    try {
+      const initialReward = await walletProvider.getInitialReward();
+      uiConsole(`Initial reward: ${initialReward}`);
+    } catch (error) {
+      uiConsole(`Error getting initial reward: ${(error as Error).message}`);
+    }
+  };
+
   const getIdToken = async () => {
     const idToken = await authenticateUser();
     uiConsole("Id Token: ", parseToken(idToken.idToken));
     return idToken.idToken;
-  };
-
-  const verifyServerSide = async (idTokenInFrontend: string) => {
-    try {
-      if (!provider) {
-        uiConsole("provider not initialized yet");
-        return;
-      }
-      // ideally this should be done on the server side
-      if (web3Auth.connectedAdapterName === WALLET_ADAPTERS.AUTH) {
-        const pubkey = await getPublicKey();
-        const jwks = jose.createRemoteJWKSet(new URL("https://api-auth.web3auth.io/jwks"));
-        const jwtDecoded = await jose.jwtVerify(idTokenInFrontend, jwks, {
-          algorithms: ["ES256"],
-        });
-        const pubKeyFromIdToken = (jwtDecoded.payload as any).wallets.find((x: { type: string }) => x.type === "web3auth_app_key").public_key;
-
-        if (pubKeyFromIdToken === pubkey) {
-          uiConsole(
-            "Validation Success!",
-            "Public Key from Provider: ",
-            pubkey,
-            "Public Key from decoded JWT: ",
-            pubKeyFromIdToken,
-            "Parsed Id Token: ",
-            await parseToken(idTokenInFrontend)
-          );
-        } else {
-          uiConsole(
-            "Validation Failed!",
-            "Public Key from Provider: ",
-            pubkey,
-            "Public Key from decoded JWT: ",
-            pubKeyFromIdToken,
-            "Parsed Id Token: ",
-            await parseToken(idTokenInFrontend)
-          );
-        }
-      } else {
-        const jwks = jose.createRemoteJWKSet(new URL("https://authjs.web3auth.io/jwks"));
-        const jwtDecoded = await jose.jwtVerify(idTokenInFrontend, jwks, {
-          algorithms: ["ES256"],
-        });
-        const addressFromIdToken = (jwtDecoded.payload as any).wallets.find((x: { type: string }) => x.type === "ethereum").address;
-        if (addressFromIdToken.toLowerCase() === address.toLowerCase()) {
-          uiConsole(
-            "Validation Success!",
-            "Address from Provider: ",
-            address,
-            "Address from decoded JWT: ",
-            addressFromIdToken,
-            "Parsed Id Token: ",
-            await parseToken(idTokenInFrontend)
-          );
-        }
-      }
-    } catch (e) {
-      uiConsole(e);
-    }
-  };
-
-  const updateConnectedChain = (chainDetails: string | CustomChainConfig) => {
-    if (typeof chainDetails === "string") {
-      setConnectedChain(chainList[chainDetails]);
-      setChainListOptionSelected(chainDetails);
-      return;
-    }
-    if (typeof chainDetails === "object") {
-      if (
-        !(
-          chainDetails.displayName in
-          Object.keys(chainList).map(function (k) {
-            return chainList[k].displayName;
-          })
-        )
-      ) {
-        setChainDetails({ ...chain, custom: chainDetails });
-      }
-      setConnectedChain(chainDetails);
-      setChainListOptionSelected("custom");
-      return;
-    }
-    uiConsole("No network or chainDetails provided");
-  };
-
-  const switchChain = async (chainConfig: CustomChainConfig) => {
-    if (!web3Auth || !provider) {
-      uiConsole("web3Auth or provider is not initialized yet");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      await addAndSwitchChain(chainConfig);
-      setChainId(await walletProvider.getChainId());
-      setAddress(await walletProvider.getAddress());
-      setBalance(await walletProvider.getBalance());
-      updateConnectedChain(chainConfig);
-      setIsLoading(false);
-      uiConsole("Chain switched successfully");
-    } catch (error) {
-      uiConsole("Failed to switch chain", error);
-      setIsLoading(false);
-    }
   };
 
   const contextProvider = {
@@ -346,26 +343,27 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     isLoading,
     address,
     balance,
+    userTokenBalance,
+    contractTokenBalance,
+    totalRewardsClaimed,
+    focusTime,
     chainId,
     playgroundConsole,
-    connectedChain,
-    chainList,
-    chainListOptionSelected,
     getUserInfo,
-    getPublicKey,
     getAddress,
     getBalance,
-    getSignature,
-    sendTransaction,
-    getPrivateKey,
     getChainId,
-    deployContract,
-    readContract,
-    writeContract,
-    verifyServerSide,
     getIdToken,
-    switchChain,
-    updateConnectedChain,
+    claimInitialReward,
+    claimRewards,
+    startFocus,
+    stopFocus,
+    getUserTokenBalance,
+    getContractTokenBalance,
+    getUserDetails,
+    getTotalRewardsClaimed,
+    getRewardRatePerSecond,
+    getInitialReward,
   };
   return <PlaygroundContext.Provider value={contextProvider}>{children}</PlaygroundContext.Provider>;
 };
