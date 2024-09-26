@@ -16,6 +16,7 @@ export interface IWalletProvider {
   getTotalRewardsClaimed: () => Promise<any>;
   getRewardRatePerSecond: () => Promise<any>;
   getInitialReward: () => Promise<any>;
+  approveTokenSpending: () => Promise<any>;
 }
 
 export const getWalletProvider = (provider: IProvider | null, uiConsole: any): IWalletProvider => {

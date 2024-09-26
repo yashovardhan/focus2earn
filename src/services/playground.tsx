@@ -20,6 +20,7 @@ export interface IPlaygroundContext {
   getBalance: () => Promise<string>;
   getChainId: () => Promise<string>;
   claimInitialReward: () => Promise<any>;
+  approveTokenSpending: () => Promise<any>;
   claimRewards: () => Promise<any>;
   startFocus: (depositAmount: string) => Promise<any>;
   stopFocus: () => Promise<any>;
@@ -47,6 +48,7 @@ export const PlaygroundContext = createContext<IPlaygroundContext>({
   getBalance: async () => "",
   getChainId: async () => "",
   claimInitialReward: async () => {},
+  approveTokenSpending: async () => {},
   claimRewards: async () => {},
   startFocus: async () => {},
   stopFocus: async () => {},
@@ -238,6 +240,23 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     }
   };
 
+  const approveTokenSpending = async () => {
+    if (!provider) {
+      uiConsole("provider not initialized yet");
+      return;
+    }
+    setIsLoading(true);
+    uiConsole("Approving token spending...");
+    try {
+      const result = await walletProvider.approveTokenSpending();
+      uiConsole(result);
+    } catch (error) {
+      uiConsole(`Error approving token spending: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const claimRewards = async () => {
     if (!provider) {
       uiConsole("provider not initialized yet");
@@ -364,6 +383,7 @@ export const Playground = ({ children }: IPlaygroundProps) => {
     getTotalRewardsClaimed,
     getRewardRatePerSecond,
     getInitialReward,
+    approveTokenSpending,
   };
   return <PlaygroundContext.Provider value={contextProvider}>{children}</PlaygroundContext.Provider>;
 };

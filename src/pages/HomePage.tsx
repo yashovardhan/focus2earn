@@ -13,7 +13,7 @@ function HomePage() {
   const { isConnected } = useWeb3Auth();
   const [loading, setLoading] = useState(false);
   const [tokenToStake, setTokenToStake] = useState("");
-  const { startFocus, stopFocus, claimRewards, claimInitialReward } = usePlayground();
+  const { startFocus, stopFocus, claimRewards, claimInitialReward, approveTokenSpending } = usePlayground();
 
   const LoaderButton = ({ ...props }) => <button {...props}>{props.children}</button>;
 
@@ -90,6 +90,17 @@ function HomePage() {
                   }}
                 >
                   Claim First Time Login Reward
+                </LoaderButton>
+                <LoaderButton
+                  className="w-full mt-10 mb-0 text-center justify-center items-center flex rounded-full px-6 py-3 text-white"
+                  style={{ backgroundColor: "#0364ff" }}
+                  onClick={async () => {
+                    setLoading(true);
+                    await approveTokenSpending();
+                    setLoading(false);
+                  }}
+                >
+                  Approve Token Spending
                 </LoaderButton>
               </Form>
               <Console />

@@ -206,6 +206,22 @@ const ethersWeb3Provider = (provider: IProvider | null, uiConsole: (...args: unk
     }
   };
 
+  const approveTokenSpending = async (): Promise<any> => {
+    try {
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const tokenContract = new ethers.Contract(focusTokenExAddress, focusTokenExAbi, signer);
+      console.log("approveTokenSpending", focus2EarnAddress, parseUnits("1000", 18));
+      const tx = await tokenContract.approve(focus2EarnAddress, parseUnits("1000", 18));
+      console.log("tx", tx);
+      await tx.wait();
+      return `Token spending approved successfully! Transaction hash: ${tx.hash}`;
+    } catch (err) {
+      console.error("Error approving token spending:", err);
+      throw new Error(`Failed to approve token spending. Message: ${(err as Error).message}`);
+    }
+  };
+
   return {
     getAddress,
     getBalance,
@@ -220,6 +236,7 @@ const ethersWeb3Provider = (provider: IProvider | null, uiConsole: (...args: unk
     getTotalRewardsClaimed,
     getRewardRatePerSecond,
     getInitialReward,
+    approveTokenSpending,
   };
 };
 
